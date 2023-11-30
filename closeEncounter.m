@@ -88,7 +88,6 @@ tF = cspice_str2et(tFs); %[s]
 tVect = linspace(t0, tF, steps);
 tVectNet = (tVect-ones(steps,1)'*tVect(1))/3600/24;
 
-
 % Closest approach will be on April 13th
 % Set moon time frame
 t0Moon = cspice_str2et('2029-04-13-00:00:00.000 UTC'); %[s]
@@ -123,15 +122,10 @@ tVectRel = (tVect-ones(steps,1)'*tVect(indMin))/3600/24;
 
 %% Perform RHS computation
 options = odeset('reltol', 1e-13, 'abstol', 1e-13);
-% state0 = [-4000;-4000;100; -10; -1; 0];
-% [10.0053246277938;-25.4913652999253;1.59974282578765]
-% state0 = [+AU;AU;0; 10.0053246277938;-25.4913652999253;1.59974282578765];
-% state0 = [5; 5; 5; 1e-3; .53-3; 1e-3];
-state0 = [AU; -AU; 0; 0; 1; 1e-3];
+
+state0 = [50; 50; 10; 4; 4; 1];
 [timeOut, fullState]= ode15s(@closeProxODE, tVect,state0, options,param);
     
-
-
 
 %% COMPUTE ACCELERATIONS
 % Retrieve data for plots:
@@ -154,18 +148,17 @@ for rr = 1:nR
     % initialize state (velocity is not relevant in this case)
     state = [randomState(1);randomState(2);randomState(3); 0; 0; 0];
     
-%     % Plot position of s/c if needed
-%     [X,Y,Z] = sphere();
-%     figure()
-%     quiver3(0,0,0,randomState(1),randomState(2),randomState(3))
-%     hold on
-%     axis equal
-%     surf(X*0.2,Y*0.2,Z*0.2)
-
-%     nameAxis(rangeApophis(rr))
-        for jjj = 1:steps
-           [~,accTypeA(rr,jjj,:)]= closeProxODE(tVect(jjj),state,param);
-        end    
+    %     % Plot position of s/c if needed
+    %     [X,Y,Z] = sphere();
+    %     figure()
+    %     quiver3(0,0,0,randomState(1),randomState(2),randomState(3))
+    %     hold on
+    %     axis equal
+    %     surf(X*0.2,Y*0.2,Z*0.2)
+    %     nameAxis(rangeApophis(rr))
+    for jjj = 1:steps
+       [~,accTypeA(rr,jjj,:)]= closeProxODE(tVect(jjj),state,param);
+    end    
 end
 % Call function for plotting
 plotAccelA(tVectRel,accTypeA,rangeApophis);
@@ -367,7 +360,6 @@ function [dState,acc] = closeProxODE(t,state,param)
     % Extract state elements
     r = state(1:3);
     nr = norm(r);
-%     V = state(4:6);
     
     x  = state(1);
     y  = state(2);
@@ -375,8 +367,6 @@ function [dState,acc] = closeProxODE(t,state,param)
     u  = state(4);
     v  = state(5);
     w  = state(6);
-    
-   
     
     
     % Retrieve ephemeris @(t) wrt SSB (ECLIPJ2000)
@@ -401,35 +391,21 @@ function [dState,acc] = closeProxODE(t,state,param)
     qMoon = (nr^2)/(norm(rMoon)^2)-2*dot(r,rMoon)/(norm(rMoon)^2);
     
     accSun = -muSun/((norm(r-rSun))^3)*(r+fEncke(qSun)*rSun); % [km/s2]
-%     accSun = muSun*(apophis/norm(apophis)^3-d/nd^3);
     accEarth = -muEarth/((norm(r-rEarth))^3)*(r+fEncke(qEarth)*rEarth); % [km/s2]
     accMoon = -muMoon/((norm(r-rMoon))^3)*(r+fEncke(qMoon)*rMoon); % [km/s2]
-%     accSRP = Psr*Cr*AMratio/nd/((nd/AU)^2)*d;
     accSRP = P0*AU^2*Cr*AMratio*d/(c*nd^3)*1e-3; % last coefficient to obtain [km/s3]
     
-%     accSun = -muSun*((r+apophis)/(norm(r+apophis)^3)-apophis/(norm(apophis)^3));
-%     accEarth = -muEarth*(r-(earth-apophis)/(norm(r-(earth-apophis))^3)+(earth-apophis)/norm(earth-apophis)^3);
-%     accMoon = -muMoon*(r-(moon-apophis)/(norm(r-(moon-apophis))^3)+(moon-apophis)/norm(moon-apophis)^3);
-%     accSRP = P0/c*(AU^2)*Cr*AMratio*(r+apophis)/(norm(r+apophis));
-%    accJ2 = 1;
-   
-%    R_earth = 6378.137;
-%     J2 = 0.00108263;
-%     kJ2 = 1.5*J2*muEarth*R_earth^2/nr^4;
-% 
-%     accJ2 = [kJ2*x/nr*(5*z^2/(nr^2)-1);
-%             kJ2*y/nr*(5*z^2/(nr^2)-1);
-%             kJ2*z/nr*(5*z^2/(nr^2)-3)];
+    %    R_earth = 6378.137;
+    %     J2 = 0.00108263;
+    %     kJ2 = 1.5*J2*muEarth*R_earth^2/nr^4;
+    % 
+    %     accJ2 = [kJ2*x/nr*(5*z^2/(nr^2)-1);
+    %             kJ2*y/nr*(5*z^2/(nr^2)-1);
+    %             kJ2*z/nr*(5*z^2/(nr^2)-3)];
         
         
-%     totAcc = accApo+accSun+accEarth+accMoon+accSRP;
-%     totAcc = accApo*8.017e9;
-%     totAcc = accEarth+accMoon;
-%     totAcc = accSun+accEarth+accMoon+accSRP;
-%      totAcc = accSun+accEarth+accMoon;
-    % Define derivatives vector
-%     totAcc = accApo+accEarth+accMoon;
-    totAcc = accSRP;
+    totAcc = accApo+accSun+accEarth+accMoon+accSRP;
+
     acc = [norm(accApo), norm(accSun), norm(accEarth), norm(accMoon), norm(accSRP)];
     
     dState = [
@@ -459,7 +435,6 @@ end
 function [] = plotAccelA(t,m3D,ranges)
     [a,~,c] = size(m3D);
         
-    
     for i = 1:a
       ACC(:,:) = m3D(i,:,:);
       figure()
