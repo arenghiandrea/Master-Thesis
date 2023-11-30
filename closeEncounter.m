@@ -484,10 +484,6 @@ end
 
 function [] = plotAccelB(epoch,accTypeB)
     a = min(size(epoch));
-%     [a,~,~] = size(accTypeB);
-    % a = number of discrete epochs
-    % b = 
-    
     for p = 1:a
         t = cspice_str2et(epoch(p,:));
         tPlot = cspice_et2utc(t,'C',0);
