@@ -79,10 +79,10 @@ param.J2 = 'no';
 % analysis
 
 steps = 3000;
-% t0s = '2029-01-01-00:00:00.000 UTC';
-% tFs = '2029-07-31-23:59:59.000 UTC';
-t0s = '2029-04-01-00:00:00.000 UTC';
-tFs = '2029-04-30-23:59:59.000 UTC';
+t0s = '2029-01-01-00:00:00.000 UTC';
+tFs = '2029-07-31-23:59:59.000 UTC';
+% t0s = '2029-04-01-00:00:00.000 UTC';
+% tFs = '2029-04-30-23:59:59.000 UTC';
 t0 = cspice_str2et(t0s); %[s]
 tF = cspice_str2et(tFs); %[s]
 tVect = linspace(t0, tF, steps);
@@ -134,10 +134,11 @@ state0 = [50; 50; 10; 4; 4; 1];
 
 %% Type A
 % Discretize ranges
-rangeApophis = [5 15 50]; % [km]
+rangeApophis = [5 15 500]; % [km]
 nR = length(rangeApophis);
 % NOTE: 5 shall be changed if more terms (J2, ellipsoid..will be included)
-accTypeA = zeros(nR,steps,5);
+% accTypeA = zeros(nR,steps,5);
+accTypeA = zeros(nR,steps,6);
 % span vector of ranges
 for rr = 1:nR
     
@@ -168,16 +169,16 @@ plotAccelA(tVectRel,accTypeA,rangeApophis);
 % Discretize times
 epochs = [
     '2029-01-13-00:00:00.000 UTC';
-%     '2029-03-13-00:00:00.000 UTC';
+    '2029-03-13-00:00:00.000 UTC';
     '2029-04-13-21:42:11.000 UTC';
-%     '2029-05-13-00:00:00.000 UTC';
+    '2029-05-13-00:00:00.000 UTC';
     '2029-07-13-00:00:00.000 UTC'];
 
 KP = min(size(epochs));
 
 sizeRanges = 400;
-ranges = linspace(2,30, sizeRanges);
-accTypeB = zeros(KP,sizeRanges,6);
+ranges = linspace(2,30000, sizeRanges);
+accTypeB = zeros(KP,sizeRanges,7);
 for tt = 1:KP
     
     discreteEpoch = cspice_str2et(epochs(tt,:));
@@ -395,18 +396,22 @@ function [dState,acc] = closeProxODE(t,state,param)
     accMoon = -muMoon/((norm(r-rMoon))^3)*(r+fEncke(qMoon)*rMoon); % [km/s2]
     accSRP = P0*AU^2*Cr*AMratio*d/(c*nd^3)*1e-3; % last coefficient to obtain [km/s3]
     
-    %    R_earth = 6378.137;
-    %     J2 = 0.00108263;
-    %     kJ2 = 1.5*J2*muEarth*R_earth^2/nr^4;
-    % 
-    %     accJ2 = [kJ2*x/nr*(5*z^2/(nr^2)-1);
-    %             kJ2*y/nr*(5*z^2/(nr^2)-1);
-    %             kJ2*z/nr*(5*z^2/(nr^2)-3)];
+    % Earth J2 effect
+    % Build relative vector
+    RJ2000 = r+apophis-earth; % [km]
+    nRJ2000 = norm(RJ2000);
+    R_earth = 6378.137; % [km]
+    J2 = 0.00108263; % [-]
+    kJ2 = 1.5*J2*muEarth*R_earth^2/nRJ2000^4;
+    
+    accJ2 = [kJ2*RJ2000(1)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-1);
+            kJ2*RJ2000(2)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-1);
+            kJ2*RJ2000(3)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-3)];
         
         
-    totAcc = accApo+accSun+accEarth+accMoon+accSRP;
+    totAcc = accApo+accSun+accEarth+accMoon+accSRP+accJ2;
 
-    acc = [norm(accApo), norm(accSun), norm(accEarth), norm(accMoon), norm(accSRP)];
+    acc = [norm(accApo), norm(accSun), norm(accEarth), norm(accMoon), norm(accSRP), norm(accJ2)];
     
     dState = [
         u;
@@ -439,19 +444,21 @@ function [] = plotAccelA(t,m3D,ranges)
       ACC(:,:) = m3D(i,:,:);
       figure()
       for j = 1:c
-         h1 = gcf;
-         set(h1, 'DefaultLineLineWidth', 2);
+         h5 = gcf;
+         set(h5, 'DefaultLineLineWidth', 2);
          semilogy(t,ACC(:,j)*1e3)
          hold on
          grid on
          axis tight
       end
       
-    legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}')
-    title('a(t)')
-    subtitle(['r_{s/c-Apo} = ',num2str(ranges(i)),' km'])
+    
+    title('Accelerations')
+    subtitle(['r = ',num2str(ranges(i)),' km'])
+    legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
     ylabel('a(t) [m/s^2]')
     xlabel('Days from Closest Encounter')
+    hold off
     end
     
     grid on
@@ -475,9 +482,10 @@ function [] = plotAccelB(epoch,accTypeB)
         semilogy(M(:,1),M(:,4)*1e3)
         semilogy(M(:,1),M(:,5)*1e3)
         semilogy(M(:,1),M(:,6)*1e3)
+        semilogy(M(:,1),M(:,7)*1e3)
         xlabel('S/c - Apophis distance [km]')
         ylabel('Acceleration [m/s^2]')
-        legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}')
+        legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
         title('a(Range)')
         subtitle(['Epoch = ',tPlot(1:end-9)])
     end
