@@ -12,6 +12,12 @@
 clc
 clear
 close all
+set(0, 'DefaultAxesLabelFontSize', 1.5);
+set(0, 'DefaultAxesTitleFontSize', 1.3);
+% set(0, 'DefaultAxesSubtitleFontSize', 1.5);
+% set(0, 'DefaultTitlesFontSize', 1.5);
+% set(0, 'DefaultAxesYLabelFontSize', 14);
+set(0,'defaulttextinterpreter','latex')
 
 %% WORKFLOW
     % 1) Import SPICE ✓
@@ -79,10 +85,28 @@ param.J2 = 'no';
 % analysis
 
 steps = 3000;
-% t0s = '2029-01-01-00:00:00.000 UTC';
-% tFs = '2029-07-31-23:59:59.000 UTC';
-t0s = '2029-04-01-00:00:00.000 UTC';
-tFs = '2029-04-30-23:59:59.000 UTC';
+
+% Define time windows of interest according to:
+% Initial Trajectory Assessment of the RAMSES Mission to (99942) Apophis
+% Topputo, Morelli, Ferrari et al.
+
+% In the paper optimization strategies for the interplanetaryu transfer are
+% provided. Different launch window are provided and the starting epoch
+% defined below correspond to the representative trajectories found.
+IntTransID = 1;
+switch IntTransID
+    case 1  
+        t0s = '2029-02-08-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';
+    case 2  
+        t0s = '2029-01-23-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';    
+    case 3  
+        t0s = '2029-01-14-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';
+        
+end
+
 t0 = cspice_str2et(t0s); %[s]
 tF = cspice_str2et(tFs); %[s]
 tVect = linspace(t0, tF, steps);
@@ -112,6 +136,7 @@ for j = 1:steps
     distApophisMoon(j) =  norm(dM(1:3,j)) ;
 end
 [minDist, indMin] = min(distApophisEarth);
+fprintf('At the beginning of CPO Apophis-Earth distance is %4.2f km.\n',distApophisEarth(1))
 % Identify epoch of closest encounter between Apophis and Earth
 closestEncounterET = tVect(indMin); % ET
 
@@ -134,10 +159,12 @@ state0 = [50; 50; 10; 4; 4; 1];
 
 %% Type A
 % Discretize ranges
-rangeApophis = [5 15 50]; % [km]
+
+rangeApophis = [0.5 5  10]; % [km]
 nR = length(rangeApophis);
 % NOTE: 5 shall be changed if more terms (J2, ellipsoid..will be included)
-accTypeA = zeros(nR,steps,5);
+% accTypeA = zeros(nR,steps,5);
+accTypeA = zeros(nR,steps,6);
 % span vector of ranges
 for rr = 1:nR
     
@@ -167,22 +194,23 @@ plotAccelA(tVectRel,accTypeA,rangeApophis);
 %% Type B
 % Discretize times
 epochs = [
-    '2029-01-13-00:00:00.000 UTC';
+    '2029-02-08-00:00:00.000 UTC';
 %     '2029-03-13-00:00:00.000 UTC';
     '2029-04-13-21:42:11.000 UTC';
 %     '2029-05-13-00:00:00.000 UTC';
-    '2029-07-13-00:00:00.000 UTC'];
+    '2029-07-30-00:00:00.000 UTC'];
 
 KP = min(size(epochs));
 
 sizeRanges = 400;
-ranges = linspace(2,30, sizeRanges);
-accTypeB = zeros(KP,sizeRanges,6);
+ranges = linspace(0.5,30, sizeRanges);
+accTypeB = zeros(KP,sizeRanges,7);
 for tt = 1:KP
     
     discreteEpoch = cspice_str2et(epochs(tt,:));
     
     for hh = 1:sizeRanges
+        % generate randomly directed vector
         RADIUS = ranges(hh);
         randoms = 2*rand(3,1)-1;
         randomState = (RADIUS/norm(randoms))*randoms;
@@ -195,90 +223,104 @@ end
 plotAccelB(epochs,accTypeB);
 
 %% PLOTS
-% % % %% Plot relative distance between apophis and Sun and Earth
-% % % figure()
-% % % hdl = gcf;
-% % % set(hdl, 'DefaultLineLineWidth', 2);
-% % % % plot(tVectNet,distApophisSun/AU)
-% % % grid on 
-% % % hold on
-% % % plot(tVectNet,distApophisEarth/AU)
-% % % hold on
-% % % xline(tVectNet(indMin),'--')
-% % % xlabel('Days')
-% % % ylabel('Distance [AU]')
-% % % legend('Sun-Apophis','Earth-Apophis','Earth closest approach','Location','best')
-% % % title('Apophis distance wrt Sun and Earth')
-% % % startTime = cspice_et2utc(tVect(1),'C',0);
-% % % sTime = startTime(1:end-9);
-% % % finalTime = cspice_et2utc(tVect(end),'C',0);
-% % % fTime = finalTime(1:end-9);
-% % % subtitle(['Time window from ', sTime,' to ',fTime])
-% % % axis tight
+%% Plot relative distance between apophis and Sun and Earth
+startTime = cspice_et2utc(tVect(1),'C',0);
+sTime = startTime(1:end-9);
+finalTime = cspice_et2utc(tVect(end),'C',0);
+fTime = finalTime(1:end-9);
+figure()
+subplot(1,2,1)
+hdl = gcf;
+set(hdl, 'DefaultLineLineWidth', 2);
+plot(tVectNet,distApophisSun/AU)
+grid on 
+hold on
+axis tight
+xline(tVectNet(indMin),'--')
+xlabel('Days')
+ylabel('Distance [AU]')
+legend('Sun-Apophis','Earth closest approach','Location','best')
+title('Apophis distance wrt Sun')
+subtitle(['Time window from ', sTime,' to ',fTime])
+%
+subplot(1,2,2)
+hdl = gcf;
+set(hdl, 'DefaultLineLineWidth', 2);
+plot(tVectNet,distApophisEarth)
+hold on, grid on, ylim([distApophisEarth(indMin)-2000000 AU*.1])
+xline(tVectNet(indMin),'--')
+str = [num2str(ceil(distApophisEarth(indMin))),' km'];
+yline(distApophisEarth(indMin),'.-',str)
+xlabel('Days')
+ylabel('Distance [km]')
+legend('Earth-Apophis','Closest approach','Location','best')
+title('Apophis distance wrt Earth')
+subtitle(['Time window from ', sTime,' to ',fTime])
 
-% % % %% Plot trajectories
-% % % figure()
-% % % hdl = gcf;
-% % % set(hdl, 'DefaultLineLineWidth', 1.5);
-% % % plot3(apophis(1,:),apophis(2,:),apophis(3,:),'Linewidth',1.3)
-% % % hold on
-% % % grid on
-% % % plot3(earth(1,:),earth(2,:),earth(3,:),'Linewidth',1.1)
-% % % plot3(moon(1,:),moon(2,:),moon(3,:),'Linewidth',1.1)
-% % % plot3(0,0,0,'oy','MarkerFaceColor','#ffcc00','MarkerSize',9)
-% % % axis equal
-% % % plot3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),'dk','MarkerFaceColor','#3333cc','MarkerSize',6)
-% % % scaleFact = 40000000;
-% % % nameAxis(scaleFact);
-% % % xlabel('x_{ECLIPJ2000} [km]')
-% % % ylabel('y_{ECLIPJ2000} [km]')
-% % % zlabel('z_{ECLIPJ2000} [km]')
-% % % plot3(apophis(1,1),apophis(2,1),apophis(3,1),'ob','MarkerSize',2)
-% % % plot3(earth(1,1),earth(2,1),earth(3,1),'or','MarkerSize',2)
-% % % legend('Apophis','Earth','Moon','Sun','Closest approach','Location','best')
-% % % title('Apophis closest approach')
-% % % subtitle('Heliocentric orbits')
-% % % 
-% % % 
-% % % %% Plot relative positions at closest encounter
-% % % figure()
-% % % plot3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),'ok','MarkerFaceColor','#3333cc','MarkerSize',6)
-% % % hold on
-% % % grid on
-% % % axis equal
-% % % plot3(earth(1,indMin),earth(2,indMin),earth(3,indMin),'ok','MarkerFaceColor','#33cc33','MarkerSize',15)
-% % % plot3(moon(1,indMin),moon(2,indMin),moon(3,indMin),'ok','MarkerFaceColor','#999966 ','MarkerSize',10)
-% % % % Plot velocities of the bodies
-% % % quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),...
-% % %     1e8*apophis(4,indMin)/minDist,1e8*apophis(5,indMin)/minDist,1e8*apophis(6,indMin)/minDist,...
-% % %     1,'Color','#3333cc','LineWidth',1.2)
-% % % quiver3(earth(1,indMin),earth(2,indMin),earth(3,indMin),...
-% % %     1e8*earth(4,indMin)/minDist,1e8*earth(5,indMin)/minDist,1e8*earth(6,indMin)/minDist,...
-% % %     1,'Color','#33cc33','LineWidth',1.2)
-% % % quiver3(moon(1,indMin),moon(2,indMin),moon(3,indMin),...
-% % %     1e8*moon(4,indMin)/minDist,1e8*moon(5,indMin)/minDist,1e8*moon(6,indMin)/minDist,...
-% % %     1,'Color','#999966','LineWidth',1.2)
-% % % % To Sun vector
-% % % quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),...
-% % %     -30*apophis(1,indMin)/minDist,-30*apophis(2,indMin)/minDist,-30*apophis(3,indMin)/minDist,...
-% % %     1,'Color','#ff6600','LineWidth',1.2)
-% % % scaleFact = 50000;
-% % % quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),scaleFact,0,0,'k')
-% % % text(apophis(1,indMin)+scaleFact,apophis(2,indMin),apophis(3,indMin), 'x')
-% % % quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,scaleFact,0,'k')
-% % % text(apophis(1,indMin),apophis(2,indMin)+scaleFact,apophis(3,indMin), 'y')
-% % % quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,0,scaleFact,'k')
-% % % text(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin)+scaleFact, 'z')
-% % % legend('Apophis','Earth','Moon','v_{Apo}','v_E','v_M','To Sun','Location','best')
-% % % title('Relative geometry at closest encounter')
-% % % closeEnc = cspice_et2utc(closestEncounterET,'C',0);
-% % % epochCE = closeEnc(1:end);
-% % % subtitle(['Epoch: ',epochCE])
-% % % xlabel('x [km]')
-% % % ylabel('y [km]')
-% % % zlabel('z [km]')
 
-% % % 
+%% Plot trajectories
+figure()
+hdl = gcf;
+set(hdl, 'DefaultLineLineWidth', 1.5);
+plot3(apophis(1,:),apophis(2,:),apophis(3,:),'Linewidth',1.3)
+hold on
+grid on
+plot3(earth(1,:),earth(2,:),earth(3,:),'Linewidth',1.1)
+plot3(moon(1,:),moon(2,:),moon(3,:),'Linewidth',1.1)
+plot3(0,0,0,'oy','MarkerFaceColor','#ffcc00','MarkerSize',9)
+axis equal
+plot3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),'dk','MarkerFaceColor','#3333cc','MarkerSize',6)
+scaleFact = 40000000;
+nameAxis(scaleFact);
+xlabel('$x_{ECLIPJ2000} [km]$')
+ylabel('$y_{ECLIPJ2000} [km]$')
+zlabel('$z_{ECLIPJ2000} [km]$')
+plot3(apophis(1,1),apophis(2,1),apophis(3,1),'ob','MarkerSize',2)
+plot3(earth(1,1),earth(2,1),earth(3,1),'or','MarkerSize',2)
+legend('Apophis','Earth','Moon','Sun','Closest approach','Location','best')
+title('Apophis closest approach')
+subtitle('Heliocentric orbits')
+
+
+%% Plot relative positions at closest encounter
+figure()
+plot3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),'ok','MarkerFaceColor','#3333cc','MarkerSize',6)
+hold on
+grid on
+axis equal
+plot3(earth(1,indMin),earth(2,indMin),earth(3,indMin),'ok','MarkerFaceColor','#33cc33','MarkerSize',15)
+plot3(moon(1,indMin),moon(2,indMin),moon(3,indMin),'ok','MarkerFaceColor','#999966 ','MarkerSize',10)
+% Plot velocities of the bodies
+quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),...
+    1e8*apophis(4,indMin)/minDist,1e8*apophis(5,indMin)/minDist,1e8*apophis(6,indMin)/minDist,...
+    1,'Color','#3333cc','LineWidth',1.2)
+quiver3(earth(1,indMin),earth(2,indMin),earth(3,indMin),...
+    1e8*earth(4,indMin)/minDist,1e8*earth(5,indMin)/minDist,1e8*earth(6,indMin)/minDist,...
+    1,'Color','#33cc33','LineWidth',1.2)
+quiver3(moon(1,indMin),moon(2,indMin),moon(3,indMin),...
+    1e8*moon(4,indMin)/minDist,1e8*moon(5,indMin)/minDist,1e8*moon(6,indMin)/minDist,...
+    1,'Color','#999966','LineWidth',1.2)
+% To Sun vector
+quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),...
+    -30*apophis(1,indMin)/minDist,-30*apophis(2,indMin)/minDist,-30*apophis(3,indMin)/minDist,...
+    1,'Color','#ff6600','LineWidth',1.2)
+scaleFact = 50000;
+quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),scaleFact,0,0,'k')
+text(apophis(1,indMin)+scaleFact,apophis(2,indMin),apophis(3,indMin), 'x')
+quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,scaleFact,0,'k')
+text(apophis(1,indMin),apophis(2,indMin)+scaleFact,apophis(3,indMin), 'y')
+quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,0,scaleFact,'k')
+text(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin)+scaleFact, 'z')
+legend('Apophis','Earth','Moon','v_{Apo}','v_E','v_M','To Sun','Location','best')
+title('Relative geometry at closest encounter')
+closeEnc = cspice_et2utc(closestEncounterET,'C',0);
+epochCE = closeEnc(1:end);
+subtitle(['Epoch: ',epochCE])
+xlabel('$x [km]$')
+ylabel('$y [km]$')
+zlabel('$z [km]$')
+
+
 
 %% WIP Plot close proximity trajectory
 % figure(4)
@@ -299,9 +341,9 @@ plotAccelB(epochs,accTypeB);
 % quiver3(0,0,0,0,0,scaleFactor,'k')
 % legend('Traj','Start','End','v_0','To Sun')
 % axis equal
-% xlabel('x_{ECLIPJ2000} [km]')
-% ylabel('y_{ECLIPJ2000} [km]')
-% zlabel('z_{ECLIPJ2000} [km]')
+% xlabel('$x_{ECLIPJ2000} [km]$')
+% ylabel('$y_{ECLIPJ2000} [km]$')
+% zlabel('$z_{ECLIPJ2000} [km]$')
 
 %% WIP: Plot perturbing accelerations 
 
@@ -310,23 +352,23 @@ plotAccelB(epochs,accTypeB);
 %     accelerations(k,1) = distances(k);
 %     
 % end
-
-% figure(5)
-% hdl = gcf;
-% set(hdl, 'DefaultLineLineWidth', 2);
-% 
-% semilogy(accelerations(:,1),accelerations(:,2));
-% hold on
-% grid on
-% semilogy(accelerations(:,1),accelerations(:,3));
-% semilogy(accelerations(:,1),accelerations(:,4));
-% semilogy(accelerations(:,1),accelerations(:,5));
-% semilogy(accelerations(:,1),accelerations(:,6));
-% semilogy(accelerations(:,1),accelerations(:,7));
-% % semilogy(accelerations(:,1),accelerations(:,7));
-% ylabel('Accelerations [km/s^2]')
-% xlabel('S/c-Apophis distance [AU]')
-% legend('acc_{Apo}','acc_{Sun}','acc_{Earth}','acc_{Moon}','acc_{SRP}','acc_{J2}')
+% % % 
+% % % figure(5)
+% % % hdl = gcf;
+% % % set(hdl, 'DefaultLineLineWidth', 2);
+% % % 
+% % % semilogy(accelerations(:,1),accelerations(:,2));
+% % % hold on
+% % % grid on
+% % % semilogy(accelerations(:,1),accelerations(:,3));
+% % % semilogy(accelerations(:,1),accelerations(:,4));
+% % % semilogy(accelerations(:,1),accelerations(:,5));
+% % % semilogy(accelerations(:,1),accelerations(:,6));
+% % % semilogy(accelerations(:,1),accelerations(:,7));
+% % % semilogy(accelerations(:,1),accelerations(:,7));
+% % % ylabel('Accelerations [km/s^2]')
+% % % xlabel('S/c-Apophis distance [AU]')
+% % % legend('acc_{Apo}','acc_{Sun}','acc_{Earth}','acc_{Moon}','acc_{SRP}','acc_{J2}')
 %% FUNCTIONS
 
 function [dState,acc] = closeProxODE(t,state,param)
@@ -395,18 +437,23 @@ function [dState,acc] = closeProxODE(t,state,param)
     accMoon = -muMoon/((norm(r-rMoon))^3)*(r+fEncke(qMoon)*rMoon); % [km/s2]
     accSRP = P0*AU^2*Cr*AMratio*d/(c*nd^3)*1e-3; % last coefficient to obtain [km/s3]
     
-    %    R_earth = 6378.137;
-    %     J2 = 0.00108263;
-    %     kJ2 = 1.5*J2*muEarth*R_earth^2/nr^4;
-    % 
-    %     accJ2 = [kJ2*x/nr*(5*z^2/(nr^2)-1);
-    %             kJ2*y/nr*(5*z^2/(nr^2)-1);
-    %             kJ2*z/nr*(5*z^2/(nr^2)-3)];
+    % Earth J2 effect
+    % Build relative vector
+    RJ2000 = r+apophis-earth; % [km]
+    nRJ2000 = norm(RJ2000);
+    R_earth = 6378.137; % [km]
+    J2 = 0.00108263; % [-]
+    kJ2 = 1.5*J2*muEarth*R_earth^2/nRJ2000^4;
+    
+    accJ2 = [kJ2*RJ2000(1)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-1);
+            kJ2*RJ2000(2)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-1);
+            kJ2*RJ2000(3)/nRJ2000*(5*RJ2000(3)^2/(nRJ2000^2)-3)];
+    
+%         accJ2 =kJ2*(1-5*RJ2000(3)^2/nRJ2000^2)*RJ2000/nRJ2000;
         
-        
-    totAcc = accApo+accSun+accEarth+accMoon+accSRP;
+    totAcc = accApo+accSun+accEarth+accMoon+accSRP+accJ2;
 
-    acc = [norm(accApo), norm(accSun), norm(accEarth), norm(accMoon), norm(accSRP)];
+    acc = [norm(accApo), norm(accSun), norm(accEarth), norm(accMoon), norm(accSRP), norm(accJ2)];
     
     dState = [
         u;
@@ -439,19 +486,21 @@ function [] = plotAccelA(t,m3D,ranges)
       ACC(:,:) = m3D(i,:,:);
       figure()
       for j = 1:c
-         h1 = gcf;
-         set(h1, 'DefaultLineLineWidth', 2);
+         h5 = gcf;
+         set(h5, 'DefaultLineLineWidth', 2);
          semilogy(t,ACC(:,j)*1e3)
          hold on
          grid on
          axis tight
       end
       
-    legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}')
-    title('a(t)')
-    subtitle(['r_{s/c-Apo} = ',num2str(ranges(i)),' km'])
-    ylabel('a(t) [m/s^2]')
+    
+    title('Accelerations')
+    subtitle(['r = ',num2str(ranges(i)),' km'])
+    legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
+    ylabel('$a(t) [m/s^2]$','Interpreter','latex')
     xlabel('Days from Closest Encounter')
+    hold off
     end
     
     grid on
@@ -475,10 +524,38 @@ function [] = plotAccelB(epoch,accTypeB)
         semilogy(M(:,1),M(:,4)*1e3)
         semilogy(M(:,1),M(:,5)*1e3)
         semilogy(M(:,1),M(:,6)*1e3)
-        xlabel('S/c - Apophis distance [km]')
-        ylabel('Acceleration [m/s^2]')
-        legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}')
-        title('a(Range)')
+        semilogy(M(:,1),M(:,7)*1e3)
+        xlabel('$ S/c - Apophis distance [km]$')
+        ylabel('$Acceleration [m/s^2]$')
+        legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
+        title('$a(Range)$')
         subtitle(['Epoch = ',tPlot(1:end-9)])
     end
+end
+
+
+function [a, b, c] = semiaxis(a,Ib_Ic, Ia_Ic, mass)
+    % Ib_Ic: Ratio of I_b to I_c
+    % Ia_Ic: Ratio of I_a to I_c
+    % mass: Mass of the ellipsoid
+    
+    % Check for valid input
+    if Ib_Ic <= 0 || Ia_Ic <= 0 || mass <= 0
+        error('Ratios and mass must be positive.');
+    end
+
+    % Solve for semi-axes using the given ratios and mass
+    % The equations are derived from the formulas for moments of inertia
+    % Ia = (1/5) * m * (b^2 + c^2)
+    % Ib = (1/5) * m * (a^2 + c^2)
+    % Ic = (1/5) * m * (a^2 + b^2)
+
+    % Calculate semi-axes
+    
+    k1 = Ia_Ic/Ib_Ic;
+    k2 = (k1+Ia_Ic*(k1-1))/(k1-Ia_Ic*(k1-1));
+    
+    % Assuming a as the known parameter
+    b = sqrt(k2*a*a);
+    c = sqrt((b*b-k1*a*a)/(k1-1));
 end
