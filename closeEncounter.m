@@ -12,7 +12,13 @@
 clc
 clear
 close all
+set(0, 'DefaultAxesLabelFontSize', 1.5);
+set(0, 'DefaultAxesTitleFontSize', 1.3);
+% set(0, 'DefaultAxesSubtitleFontSize', 1.5);
+% set(0, 'DefaultTitlesFontSize', 1.5);
+% set(0, 'DefaultAxesYLabelFontSize', 14);
 set(0,'defaulttextinterpreter','latex')
+
 %% WORKFLOW
     % 1) Import SPICE ✓
     % 2) Define targets of interest (their code in catalogue)
@@ -79,10 +85,28 @@ param.J2 = 'no';
 % analysis
 
 steps = 3000;
-% t0s = '2029-01-01-00:00:00.000 UTC';
-% tFs = '2029-07-31-23:59:59.000 UTC';
-t0s = '2029-04-01-00:00:00.000 UTC';
-tFs = '2029-04-30-23:59:59.000 UTC';
+
+% Define time windows of interest according to:
+% Initial Trajectory Assessment of the RAMSES Mission to (99942) Apophis
+% Topputo, Morelli, Ferrari et al.
+
+% In the paper optimization strategies for the interplanetaryu transfer are
+% provided. Different launch window are provided and the starting epoch
+% defined below correspond to the representative trajectories found.
+IntTransID = 1;
+switch IntTransID
+    case 1  
+        t0s = '2029-02-08-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';
+    case 2  
+        t0s = '2029-01-23-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';    
+    case 3  
+        t0s = '2029-01-14-00:00:00.000 UTC';
+        tFs = '2029-07-30-23:59:59.000 UTC';
+        
+end
+
 t0 = cspice_str2et(t0s); %[s]
 tF = cspice_str2et(tFs); %[s]
 tVect = linspace(t0, tF, steps);
@@ -112,6 +136,7 @@ for j = 1:steps
     distApophisMoon(j) =  norm(dM(1:3,j)) ;
 end
 [minDist, indMin] = min(distApophisEarth);
+fprintf('At the beginning of CPO Apophis-Earth distance is %4.2f km.\n',distApophisEarth(1))
 % Identify epoch of closest encounter between Apophis and Earth
 closestEncounterET = tVect(indMin); % ET
 
@@ -134,7 +159,8 @@ state0 = [50; 50; 10; 4; 4; 1];
 
 %% Type A
 % Discretize ranges
-rangeApophis = [5 15 500]; % [km]
+
+rangeApophis = [0.5 5  10]; % [km]
 nR = length(rangeApophis);
 % NOTE: 5 shall be changed if more terms (J2, ellipsoid..will be included)
 % accTypeA = zeros(nR,steps,5);
@@ -168,22 +194,23 @@ plotAccelA(tVectRel,accTypeA,rangeApophis);
 %% Type B
 % Discretize times
 epochs = [
-    '2029-01-13-00:00:00.000 UTC';
-    '2029-03-13-00:00:00.000 UTC';
+    '2029-02-08-00:00:00.000 UTC';
+%     '2029-03-13-00:00:00.000 UTC';
     '2029-04-13-21:42:11.000 UTC';
-    '2029-05-13-00:00:00.000 UTC';
-    '2029-07-13-00:00:00.000 UTC'];
+%     '2029-05-13-00:00:00.000 UTC';
+    '2029-07-30-00:00:00.000 UTC'];
 
 KP = min(size(epochs));
 
 sizeRanges = 400;
-ranges = linspace(2,40000, sizeRanges);
+ranges = linspace(0.5,30, sizeRanges);
 accTypeB = zeros(KP,sizeRanges,7);
 for tt = 1:KP
     
     discreteEpoch = cspice_str2et(epochs(tt,:));
     
     for hh = 1:sizeRanges
+        % generate randomly directed vector
         RADIUS = ranges(hh);
         randoms = 2*rand(3,1)-1;
         randomState = (RADIUS/norm(randoms))*randoms;
@@ -284,7 +311,7 @@ quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,scaleFact,0,'k')
 text(apophis(1,indMin),apophis(2,indMin)+scaleFact,apophis(3,indMin), 'y')
 quiver3(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin),0,0,scaleFact,'k')
 text(apophis(1,indMin),apophis(2,indMin),apophis(3,indMin)+scaleFact, 'z')
-legend('Apophis','Earth','Moon','$v_{Apo}$','$v_E$','$v_M$','To Sun','Location','best')
+legend('Apophis','Earth','Moon','v_{Apo}','v_E','v_M','To Sun','Location','best')
 title('Relative geometry at closest encounter')
 closeEnc = cspice_et2utc(closestEncounterET,'C',0);
 epochCE = closeEnc(1:end);
@@ -470,7 +497,7 @@ function [] = plotAccelA(t,m3D,ranges)
     
     title('Accelerations')
     subtitle(['r = ',num2str(ranges(i)),' km'])
-    legend('$a_{Apo}$','$a_{Sun}$','$a_{Earth}$','$a_{Moon}$','$a_{SRP}$','$a_{J2}$')
+    legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
     ylabel('$a(t) [m/s^2]$','Interpreter','latex')
     xlabel('Days from Closest Encounter')
     hold off
@@ -498,10 +525,37 @@ function [] = plotAccelB(epoch,accTypeB)
         semilogy(M(:,1),M(:,5)*1e3)
         semilogy(M(:,1),M(:,6)*1e3)
         semilogy(M(:,1),M(:,7)*1e3)
-        xlabel('$S/c - Apophis distance [km]$')
+        xlabel('$ S/c - Apophis distance [km]$')
         ylabel('$Acceleration [m/s^2]$')
-        legend('$a_{Apo}$','$a_{Sun}$','$a_{Earth}$','$a_{Moon}$','$a_{SRP}$','$a_{J2}$')
+        legend('a_{Apo}','a_{Sun}','a_{Earth}','a_{Moon}','a_{SRP}','a_{J2}')
         title('$a(Range)$')
         subtitle(['Epoch = ',tPlot(1:end-9)])
     end
+end
+
+
+function [a, b, c] = semiaxis(a,Ib_Ic, Ia_Ic, mass)
+    % Ib_Ic: Ratio of I_b to I_c
+    % Ia_Ic: Ratio of I_a to I_c
+    % mass: Mass of the ellipsoid
+    
+    % Check for valid input
+    if Ib_Ic <= 0 || Ia_Ic <= 0 || mass <= 0
+        error('Ratios and mass must be positive.');
+    end
+
+    % Solve for semi-axes using the given ratios and mass
+    % The equations are derived from the formulas for moments of inertia
+    % Ia = (1/5) * m * (b^2 + c^2)
+    % Ib = (1/5) * m * (a^2 + c^2)
+    % Ic = (1/5) * m * (a^2 + b^2)
+
+    % Calculate semi-axes
+    
+    k1 = Ia_Ic/Ib_Ic;
+    k2 = (k1+Ia_Ic*(k1-1))/(k1-Ia_Ic*(k1-1));
+    
+    % Assuming a as the known parameter
+    b = sqrt(k2*a*a);
+    c = sqrt((b*b-k1*a*a)/(k1-1));
 end
