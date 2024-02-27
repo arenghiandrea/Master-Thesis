@@ -369,6 +369,50 @@ zlabel('$z [km]$')
 % % % ylabel('Accelerations [km/s^2]')
 % % % xlabel('S/c-Apophis distance [AU]')
 % % % legend('acc_{Apo}','acc_{Sun}','acc_{Earth}','acc_{Moon}','acc_{SRP}','acc_{J2}')
+
+
+% close all
+
+
+
+
+
+%% IMPULSIVE GUIDANCE SOLUTION (fmincon)
+
+% Define initial guess
+state0 = [];
+
+% Choose performace index
+    PIX = 'deltav';
+%     PIX = 'tof';
+
+% Define auxiliary function to be minimized
+fun2Minimize = @(x) objectiveFun(x,PIX);
+
+% Define non linear constraint function
+funNLConst = @(x) constraints(x, param);
+
+% set fmincon options
+optionsFMC = optimoptions('fmincon','SpecifyObjectiveGradient',false, ...
+    'SpecifyConstraintGradient',false,...
+    'CheckGradient',false,...
+    'algorithm','active-set');
+% Define (in)equalities matrices
+A = [];
+b = [];
+Aeq = [];
+beq = [];
+% lb, ub
+
+% % Perform fmincon
+%  [out1, fval, out3,~] = fmincon(fun2Minimize,state0,...
+%      A,b,Aeq,beq,...
+%      [],[],... % boundaries
+%      funNLConst,...
+%      optionsFMC);
+
+% fprintf(['The search for optimal ',PIX ,' resulted in: ', fval);
+
 %% FUNCTIONS
 
 function [dState,acc] = closeProxODE(t,state,param)
