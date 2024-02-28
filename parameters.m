@@ -20,15 +20,15 @@ AMratio = 0.015;
 Psr = 4.6e-6; % N/m2
 Tmax = 50; % [N]
 g0 = 9.81; 
-Isp = 500; % [s] 
+Isp = 400; % [s] 
 
 
 % NORMALIZING FACTORS
-VEL = sqtrt(muSun/AU); % [km/s]
+VEL = sqrt(muSun/AU); % [km/s]
 TIME = AU/VEL; % [s]
 
 MASS = massSC; 
-
+    
 % Build struct for parameters
 param.muSun = muSun;
 param.muEarth = muEarth;
