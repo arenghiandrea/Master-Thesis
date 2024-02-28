@@ -160,7 +160,7 @@ state0 = [50; 50; 10; 4; 4; 1];
 %% Type A
 % Discretize ranges
 
-rangeApophis = [0.5 5  10]; % [km]
+rangeApophis = [0.5 1 2 3 5]; % [km]
 nR = length(rangeApophis);
 % NOTE: 5 shall be changed if more terms (J2, ellipsoid..will be included)
 % accTypeA = zeros(nR,steps,5);
@@ -203,7 +203,7 @@ epochs = [
 KP = min(size(epochs));
 
 sizeRanges = 400;
-ranges = linspace(0.5,30, sizeRanges);
+ranges = linspace(0.5,5, sizeRanges);
 accTypeB = zeros(KP,sizeRanges,7);
 for tt = 1:KP
     
@@ -532,7 +532,7 @@ function [] = plotAccelA(t,m3D,ranges)
       for j = 1:c
          h5 = gcf;
          set(h5, 'DefaultLineLineWidth', 2);
-         semilogy(t,ACC(:,j)*1e3)
+         semilogy(t,ACC(:,j)*1e3) % THIS MAKES THE ACCELERATIONS IN M/S^2
          hold on
          grid on
          axis tight

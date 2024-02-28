@@ -9,8 +9,7 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
         %
         %
     % OUTPUTS: derivatives of state vector dState
-    t
-    state
+    
     % Extract constants for easier use
     muSun = param.muSun;
     muEarth = param.muEarth;
@@ -43,7 +42,7 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
     u  = state(4);
     v  = state(5);
     w  = state(6);
-    m = state(7); % mass
+    m = state(7) % mass
     
     % extract lambda values
     lambdaR = state(8:10);
@@ -113,9 +112,8 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
     
     % INCLUDE SWITCHING FUNCTION CONTROL HERE!!!
     SF = - norm(lambdaV)*Isp*g0/m-lambdaM;
-%     if SF < 0 && (nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>70)
-%     ADD LATER
-    if SF < 0 
+    if SF < 0 && (nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>90)
+        
         % LATER INSERT FURTHER CONTROL OVER STATE/PHASE ANGLE
 %         if nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>90 %range in [km] // later insert other conditions
             throttle = 1;
@@ -188,5 +186,5 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
         - throttle/m*Tmax*lambdaV(2)/norm(lambdaV);
         - throttle/m*Tmax*lambdaV(3)/norm(lambdaV)];
     m;
-    NC = norm(control);
+    NC = norm(control)
 end
