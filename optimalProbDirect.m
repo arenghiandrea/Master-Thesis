@@ -19,9 +19,9 @@ function [BC] = optimalProbDirect(costateOpt, tLaunch,  state0, param, targetSta
     options = odeset('reltol', 1e-12, 'abstol', 1e-12);
     
     % Integrate two body problem
-    [~, stateOut] = ode15s(@DYN_RAMSES_DIRECT, [tLaunch tArrival], stateOrigin, options, param);
+    [~, stateOut] = ode113(@DYN_RAMSES_DIRECT, [tLaunch tArrival], stateOrigin, options, param);
 
-    % retrieve final state to compute final conditions
+    % retrieve final state to compute final conditions (normalized)
     posArrival = stateOut(end,1:3);
     velArrival = stateOut(end,4:6);
     massArrival = stateOut(end,7);
@@ -45,7 +45,8 @@ function [BC] = optimalProbDirect(costateOpt, tLaunch,  state0, param, targetSta
     %% TRASVERSALITY CONDITION??
 % RHS_end = DYN_RAMSES_DIRECT(tArrival,stateOut,param);
 
-statePsi = [targetState; state0(7); zeros(7,1)];
+% BE SURE THAT ALL OF THE FOLLOWING IS NORMALIZED
+statePsi = [targetState; state0(7); lam0];
 psiArr = DYN_RAMSES_DIRECT(tArrival,statePsi,param);
 
 psiArr_small = psiArr(1:6);
@@ -57,14 +58,15 @@ H_tF = 1 + dot(lRArr,velArrival)+...
     dot(lVArr,accFin)+...
     param.Tmax/param.Isp/param.g0*U_fin*SF_fin;
     
-
-
-TR_COND = H_tF-dot(lambdaArrival(1:6),psiArr_small);
-    
+% dd0fs = lambdaArrival(1:6);
+% help = dot(lambdaArrival(1:6)',psiArr_small);
+TR_COND = H_tF-dot(lambdaArrival(1:6)',psiArr_small);
+% TR_COND = H_tF-(lambdaArrival(1:6)).*psiArr_small;
+    pp = stateOut(end,1:6);
 % BC 
     BC = [ stateOut(end,1:6)'-targetState;
-        lMArr;
-%            lMArr+norm(lVArr)*param.Isp*param.g0/massArrival;
+%         lMArr;
+           lMArr+norm(lVArr)*param.Isp*param.g0/massArrival;
            TR_COND];
 
 end

@@ -9,22 +9,26 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
         %
         %
     % OUTPUTS: derivatives of state vector dState
-    t
-    state
-    % Extract constants for easier use
+    
+    %% UNLOCK TO SEE DIMENSION OF STATE AFTER NORMALIZATION
+    
+%     state
+
+
+    % Extract constants for easier use (already normalized)
     muSun = param.muSun;
     muEarth = param.muEarth;
     muMoon = param.muMoon;
     muApo = param.muApo;
 %     G = param.G;
     P0 = param.P0;
-    c = param.c;
+%     c = param.c;
     AU = param.AU;
     Cr = param.Cr;
-%     Psr = param.Psr;
-%     A = param.A;
+    Psr = param.Psr;
+    A = param.A;
 %     massSC = param.massSC;
-    AMratio = param.AMratio;
+%     AMratio = param.AMratio;
 %     J2 = param.J2;
     
     % Thrusting parameters
@@ -51,15 +55,15 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
     lambdaM = state(14);
     
     % Retrieve ephemeris @(t) wrt SSB (ECLIPJ2000)
-    apophis = cspice_spkpos('20099942',t,'ECLIPJ2000','NONE','10'); %[km; km/s] rAS
-    earth = cspice_spkpos('Earth',t,'ECLIPJ2000','NONE','10'); %[km; km/s] rES
-    moon = cspice_spkpos('Moon',t,'ECLIPJ2000','NONE','10');   %[km; km/s] rMS
+    apophis = cspice_spkpos('20099942',t*param.TIME,'ECLIPJ2000','NONE','10'); %[km; km/s] rAS
+    earth = cspice_spkpos('Earth',t*param.TIME,'ECLIPJ2000','NONE','10'); %[km; km/s] rES
+    moon = cspice_spkpos('Moon',t*param.TIME,'ECLIPJ2000','NONE','10');   %[km; km/s] rMS
     
     % Relative vectors: r_j
-    rSun = -apophis;
-    rEarth = earth-apophis;
-    rMoon = moon - apophis;
-    d = r+apophis;
+    rSun = -apophis/param.AU;
+    rEarth = (earth-apophis)/param.AU;
+    rMoon = (moon - apophis)/param.AU;
+    d = (r+apophis)/param.AU;
     nd = norm(d);
     
     
@@ -71,27 +75,28 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
     %% PERURBATIONS (accelerations)
     
     % Apophis gravity field
-    accApo = -muApo*r/(nr^3); % gravity field of Apophis [km/s2]
+    accApo = -muApo*r/(nr^3); % gravity field of Apophis [km/s2] ADIMENS
     
    % Sun gravity field
-    accSun = -muSun/((norm(r-rSun))^3)*(r+fEnckeDirect(r,rSun)*rSun); % [km/s2]
+    accSun = -muSun/((norm(r-rSun))^3)*(r+fEnckeDirect(r,rSun)*rSun); % [km/s2] ADIMENS
     % Earth gravity field
-    accEarth = -muEarth/((norm(r-rEarth))^3)*(r+fEnckeDirect(r,rEarth)*rEarth); % [km/s2]
+    accEarth = -muEarth/((norm(r-rEarth))^3)*(r+fEnckeDirect(r,rEarth)*rEarth); % [km/s2] ADIMENS
     % Moon gravity field
-    accMoon = -muMoon/((norm(r-rMoon))^3)*(r+fEnckeDirect(r,rMoon)*rMoon); % [km/s2]
+    accMoon = -muMoon/((norm(r-rMoon))^3)*(r+fEnckeDirect(r,rMoon)*rMoon); % [km/s2] ADIMENS
     
     % Solar Radiation Pressure
-    KSRP = P0*AU^2*Cr*AMratio/c*1e-3;
-    accSRP = P0*AU^2*Cr*AMratio*d/(c*nd^3)*1e-3; % [3x1] last coefficient to obtain [km/s3]
-    
-    %% check consistency
-%     accSRP = KSRP*d/(nd^3);
-    
-    % Earth J2 effect
+%     KSRP = P0*AU^2*Cr*AMratio/c*1e-3; OLD
+%     accSRP = P0*AU^2*Cr*AMratio*d/(c*nd^3)*1e-3; OLD
+    KSRP = Psr*(AU^2)*Cr*A/(param.AU)^2; % [N km^2 * 1e-3] --> NOTE THAT THIS COEFFICIENT IS ALREADY ADIMENS APART FROM au^2, then added
+    accSRP = KSRP/m*d/(nd^3);% [3x1] last coefficient to obtain [km/s3]
+    % now SRP is more accurate since it includes the effect of variable
+    % mass
+        
+    %% Earth J2 effect
     % Build relative vector
-    rJ2 = r+apophis-earth; % [km]
+    rJ2 = r+(apophis-earth)/param.AU; % [km] ADIMENS (r was already, only other part left
     nRJ2000 = norm(rJ2);
-    R_earth = 6378.137; % [km]
+    R_earth = 6378.137/param.AU; % [km]
     J2 = 0.00108263; % [-]
     kJ2 = 1.5*J2*muEarth*R_earth^2/nRJ2000^4;
     
@@ -113,9 +118,9 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
     
     % INCLUDE SWITCHING FUNCTION CONTROL HERE!!!
     SF = - norm(lambdaV)*Isp*g0/m-lambdaM;
-%     if SF < 0 && (nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>70)
+    if SF < 0 && (nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>70)
 %     ADD LATER
-    if SF < 0 
+%     if SF < 0 
         % LATER INSERT FURTHER CONTROL OVER STATE/PHASE ANGLE
 %         if nr <1 || nr>9.5 || phaseAngle<20 || phaseAngle>90 %range in [km] // later insert other conditions
             throttle = 1;
@@ -132,19 +137,19 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
                             +derGrav(r,rSun, muSun, kkk, 1)+... % sun
                             +derGrav(r,rEarth, muEarth, kkk, 1)+... % earth
                             +derGrav(r,rMoon, muMoon, kkk, 1)+... % moon
-                            +derSRP(d,KSRP, kkk, 1)+... % SRP
+                            +derSRP(d,KSRP,m, kkk, 1)+... % SRP
                             +derJ2(rJ2,kJ2,kkk,1))+...
             lambdaV(2)*(derApophis(r,muApo, kkk, 2)+... % apophis
                             +derGrav(r,rSun, muSun, kkk, 2)+... % sun
                             +derGrav(r,rEarth, muEarth, kkk, 2)+... % earth
                             +derGrav(r,rMoon, muMoon, kkk, 2)+... % moon
-                            +derSRP(d,KSRP, kkk, 2)+... % SRP
+                            +derSRP(d,KSRP,m, kkk, 2)+... % SRP
                             +derJ2(rJ2,kJ2,kkk,2))+...
             lambdaV(3)*(derApophis(r,muApo, kkk, 3)+... % apophis
                             +derGrav(r,rSun, muSun, kkk, 3)+... % sun
                             +derGrav(r,rEarth, muEarth, kkk, 3)+... % earth
                             +derGrav(r,rMoon, muMoon, kkk, 3)+... % moon
-                            +derSRP(d,KSRP, kkk, 3)+... % SRP
+                            +derSRP(d,KSRP,m, kkk, 3)+... % SRP
                             +derJ2(rJ2,kJ2,kkk,3));
     end
     
@@ -152,9 +157,8 @@ function [dY,totAcc] = DYN_RAMSES_DIRECT(t,state,param)
        RHS_lambda(kkkk) = lambdaR(kkkk-3); 
     end
     
-    RHS_lambda(7) = norm(lambdaV)*Tmax*throttle/(m^2);
-      %% RICORDA DI CAMBIARE IL SEGNO A TUTTA LA RHS DI LAMBDA_DOT COME DA EQUAZIONE (LDOT = - dH/dx)
-        % prima scrivi le semplici derivate, assembla e cambia il segno poi
+    RHS_lambda(7) = norm(lambdaV)*Tmax*throttle/(m^2)-1/(nd^3)/(m^2)*(dot(lambdaV,d));
+      %% RICORDA DI CAMBIARE IL SEGNO A TUTTA LA RHS DI LAMBDA_DOT COME DA EQUAZIONE (LDOT = - dH/dx) --> DONE inn line below
     RHS_lambda = -RHS_lambda;
     
     

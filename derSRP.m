@@ -1,9 +1,10 @@
-function [derivative] = derSRP(d,KSRP, main, dir)
+function [derivative] = derSRP(d,KSRP,m, main, dir)
 % PURPOSE: compute the lambda_dot RHS contribution of the SRP accoerding to
 %           derivation variable (1 = x, 2 = y, 3 = z)
 
 % INPUT: d = r+apophis
 %        KSRP = constant terms factor
+%        s/c mass
 %        main, specify main derivation
 %        dir, specify component of derivation 
 
